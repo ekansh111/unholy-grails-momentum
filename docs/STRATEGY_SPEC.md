@@ -130,11 +130,18 @@ are configurable so all combinations are testable.
   last traded price" convention, which the Clenow baseline also uses, so the comparison is
   symmetric. This is an optimistic (upper-bound) recovery assumption in a survivorship-free
   backtest; both systems share it.
-- **Causal adjustment repair.** NSE vendor data carries occasional corrupt single-day
-  adjusted-close spikes (e.g. adjClose +300% on a day the raw close fell 20%). The loader
-  repairs only days where the adjusted return is wild **and** the raw return is tame
-  **and** the implied adjustment factor itself jumped — so genuine splits, dividends and
-  real large moves are left untouched. See `src/data.py:_repair_adjusted_close`.
+- **Adjustment cleaning (two selectable modes, config `cleaning:`).**
+  - `factor_repair` (default): raw-anchored repair — fix a day only where the adjusted
+    return is wild **and** the raw return is tame **and** the implied adjustment factor
+    itself jumped, so genuine splits/dividends/large moves are untouched. Fully removes
+    corrupt single-day adjusted spikes (e.g. PFC's bogus +300% day → back to ~real 4×).
+    See `src/data.py:_repair_adjusted_close`.
+  - `clenow`: a faithful port of the Clenow baseline's pipeline (quarantine series with
+    >3 daily ratios outside [1/3, 3]; repair isolated reverting spikes; cap residual daily
+    ratios). Works on the adjusted close **alone** — more conservative on shape-cascade
+    corruption (quarantines it) but cruder on spikes (PFC stays ~15× because it only caps
+    the ratio, never consulting the raw close). The **India** configs use this so the panel
+    matches the Clenow baseline bit-for-bit (the fairer comparison on imperfect NSE data).
 
 ## Metrics (match the book + the Clenow reports)
 CAGR, Max Drawdown, **MAR (CAGR/MaxDD)**, annualised return stdev, Sharpe (book's caveat

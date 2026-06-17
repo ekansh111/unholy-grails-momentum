@@ -20,6 +20,13 @@ initial_capital: 100000
 slippage_bps: 5
 commission_per_trade: 1.0
 
+# Price cleaning: "factor_repair" (this repo's stricter raw-anchored repair) or
+# "clenow" (the baseline's pipeline). US EODHD data is clean, so the choice barely
+# moves results (100-Day High filtered: MAR 0.30 vs 0.27) — we keep the stricter
+# default. India uses "clenow" instead, because NSE data quality makes the cleaning
+# choice material and matching the baseline bit-for-bit is the fairer comparison there.
+cleaning: factor_repair
+
 # Portfolio
 max_positions: 20
 liquidity_floor: 1000000          # $1M 21-day avg turnover floor (book: $500k AUD)

@@ -166,10 +166,78 @@ def _wild_ratio_count(adj_close: np.ndarray) -> int:
     return int(np.sum((r > WILD_RATIO_HI) | (r < WILD_RATIO_LO)))
 
 
-def _derive_adjusted(df: pd.DataFrame) -> pd.DataFrame:
+# ----------------------------------------------------------------------------
+# "Clenow" sophisticated cleaning — a faithful port of the cleaning in
+# clenowMomentum/dataLoader.py (repairPrices + capRatios + countWildRatios +
+# cleanAdjustedClose). Works on the adjusted-close series ALONE (it never reads
+# the raw close), so it can quarantine shape-cascade corruption that a
+# spike-by-spike repair cannot. Selectable via config `cleaning: clenow` so the
+# Unholy Grails panel can match the Clenow baseline's exact prices bit-for-bit.
+# ----------------------------------------------------------------------------
+CLENOW_RATIO_LO = 1.0 / 3
+CLENOW_RATIO_HI = 3.0
+CLENOW_MAX_WILD = 3
+
+
+def _count_wild_ratios_clenow(adj: np.ndarray) -> int:
+    finite = np.where(np.isfinite(adj) & (adj > 0))[0]
+    if len(finite) < 2:
+        return 0
+    r = adj[finite[1:]] / adj[finite[:-1]]
+    return int(((r > CLENOW_RATIO_HI) | (r < CLENOW_RATIO_LO)).sum())
+
+
+def _repair_prices_clenow(px: np.ndarray, passes: int = 5) -> np.ndarray:
+    """Erase ISOLATED single-day spikes that revert: a day >2x both neighbours
+    (or <0.5x both) -> geometric mean of its neighbours. Persistent level
+    shifts are kept. Non-causal (reads the following day), as in the backtest."""
+    px = px.astype(float).copy()
+    px[~np.isfinite(px) | (px <= 0)] = np.nan
+    if np.isnan(px).any():
+        px = pd.Series(px).ffill().bfill().to_numpy(copy=True)
+    for _ in range(passes):
+        if len(px) < 3:
+            break
+        up_prev = px[1:-1] / px[:-2]
+        up_next = px[1:-1] / px[2:]
+        bad = ((up_prev > 2.0) & (up_next > 2.0)) | ((up_prev < 0.5) & (up_next < 0.5))
+        if not bad.any():
+            break
+        idx = np.where(bad)[0] + 1
+        px[idx] = np.sqrt(px[idx - 1] * px[idx + 1])
+    return px
+
+
+def _cap_ratios_clenow(px: np.ndarray, lo: float = CLENOW_RATIO_LO, hi: float = CLENOW_RATIO_HI) -> np.ndarray:
+    """Rebuild the path with daily ratios clipped to [lo, hi]."""
+    ratios = np.ones(len(px))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ratios[1:] = px[1:] / px[:-1]
+    ratios[~np.isfinite(ratios)] = 1.0
+    ratios = np.clip(ratios, lo, hi)
+    base = px[0] if (np.isfinite(px[0]) and px[0] > 0) else 1.0
+    return base * np.cumprod(ratios)
+
+
+def _clean_adjusted_close_clenow(adj: np.ndarray) -> np.ndarray:
+    """Quarantine (>3 wild daily ratios -> all-NaN), else repair isolated spikes
+    and cap residual daily ratios. Mirrors Clenow's cleanAdjustedClose."""
+    finite = np.isfinite(adj) & (adj > 0)
+    if finite.sum() < 3:
+        return np.where(finite, adj, np.nan)
+    if _count_wild_ratios_clenow(adj) > CLENOW_MAX_WILD:
+        return np.full_like(adj, np.nan, dtype=float)   # shape-corrupted -> refuse
+    repaired = _cap_ratios_clenow(_repair_prices_clenow(adj))
+    return np.where(finite, repaired, np.nan)
+
+
+def _derive_adjusted(df: pd.DataFrame, cleaning: str = "factor_repair") -> pd.DataFrame:
     close = df["close"].to_numpy(dtype=float)
     adj_raw = df["adjClose"].to_numpy(dtype=float)
-    adj = _repair_adjusted_close(close, adj_raw)
+    if cleaning == "clenow":
+        adj = _clean_adjusted_close_clenow(adj_raw)
+    else:  # "factor_repair" — raw-anchored causal repair (this repo's default)
+        adj = _repair_adjusted_close(close, adj_raw)
     with np.errstate(divide="ignore", invalid="ignore"):
         factor = np.where((close > 0) & np.isfinite(close), adj / close, np.nan)
     out = pd.DataFrame({"date": df["date"].to_numpy()})
@@ -203,6 +271,7 @@ def load_panel(config: dict, universe: Universe) -> Panel:
     n = len(calendar)
 
     # 2) Symbols = union of all PIT members that actually have a parquet file.
+    cleaning = config.get("cleaning", "factor_repair")
     candidate = sorted(universe.all_tickers_ever())
     symbols: list[str] = []
     frames: dict[str, pd.DataFrame] = {}
@@ -211,15 +280,18 @@ def load_panel(config: dict, universe: Universe) -> Panel:
         df = _read_symbol(data_dir, sym)
         if df is None:
             continue
-        adj = _derive_adjusted(df)
-        n_wild = _wild_ratio_count(adj["adjClose"].to_numpy(dtype=float))
-        if n_wild > MAX_WILD_RATIOS:
+        adj = _derive_adjusted(df, cleaning=cleaning)
+        adj_close = adj["adjClose"].to_numpy(dtype=float)
+        if not np.isfinite(adj_close).any():
+            quarantined.append(sym)        # clenow cleaning refused a shape-corrupted series
+            continue
+        if cleaning != "clenow" and _wild_ratio_count(adj_close) > MAX_WILD_RATIOS:
             quarantined.append(sym)        # bad vendor series — exclude from all selection/valuation
             continue
         symbols.append(sym)
         frames[sym] = adj
     if quarantined:
-        print(f"  quarantined {len(quarantined)} symbols (>{MAX_WILD_RATIOS} wild daily ratios)")
+        print(f"  cleaning={cleaning}: quarantined {len(quarantined)} symbols")
     symbol_index = {s: i for i, s in enumerate(symbols)}
     m = len(symbols)
 

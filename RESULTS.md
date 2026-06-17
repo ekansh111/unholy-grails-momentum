@@ -50,30 +50,30 @@ row's scored series begins (note the India report benchmark only starts 2005).
 ## INDIA — Nifty 500 universe, strategies 1998-09-01 → 2026-04-30
 
 Sorted by MAR (risk-adjusted return = CAGR / |MaxDD|). 'From' = the year each
-row's scored series begins (note the India report benchmark only starts 2005).
+row's scored series begins (note the India report benchmark only starts 2005). Prices use the **Clenow cleaning pipeline** (matched to the baseline bit-for-bit; see the data-quality note in the README — it is *less* aggressive than this repo's stricter `factor_repair`, so these India levels are a shared upper bound).
 
 | Strategy | From | CAGR | MaxDD | MAR | Sharpe | Exposure | AvgPos | Win% | Payoff | Trades |
 |---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
 | Clenow — 20-position cap | 1998 | 11.0% | -18.6% | 0.59 | 1.11 | 38.7% | 15.6 | 47.7% | — | 2076 |
 | Clenow — book (uncapped) | 1998 | 21.9% | -38.7% | 0.56 | 1.20 | 74.3% | 30.8 | 46.8% | — | 4541 |
-| 52-Week High (filtered) | 1998 | 14.3% | -34.2% | 0.42 | 0.83 | 62.3% | 12.4 | 45.6% | 2.39 | 1232 |
-| 100-Day High (filtered) | 1998 | 16.3% | -40.0% | 0.41 | 0.85 | 67.0% | 13.3 | 42.0% | 2.81 | 1387 |
-| Golden Cross (filtered) | 1998 | 11.6% | -38.0% | 0.30 | 0.77 | 46.8% | 9.3 | 44.6% | 2.74 | 1273 |
-| Bollinger Breakout (filtered) | 1998 | 15.5% | -57.8% | 0.27 | 0.68 | 79.3% | 15.7 | 45.8% | 2.95 | 797 |
-| Bollinger Breakout (raw) | 1998 | 16.9% | -63.9% | 0.26 | 0.72 | 86.8% | 17.3 | 43.2% | 3.11 | 865 |
-| Golden Cross (raw) | 1998 | 16.0% | -62.1% | 0.26 | 0.70 | 91.5% | 18.0 | 38.5% | 3.98 | 714 |
+| 52-Week High (filtered) | 1998 | 16.7% | -32.4% | 0.52 | 0.93 | 62.8% | 12.5 | 45.6% | 2.79 | 1236 |
+| 100-Day High (filtered) | 1998 | 19.3% | -41.8% | 0.46 | 0.99 | 67.3% | 13.4 | 42.3% | 2.97 | 1395 |
+| Golden Cross (filtered) | 1998 | 12.7% | -35.0% | 0.36 | 0.86 | 46.9% | 9.3 | 45.2% | 2.71 | 1272 |
+| Bollinger Breakout (filtered) | 1998 | 17.1% | -64.6% | 0.26 | 0.72 | 79.9% | 15.7 | 44.6% | 2.83 | 802 |
+| Golden Cross (raw) | 1998 | 14.7% | -65.1% | 0.23 | 0.63 | 91.8% | 18.1 | 38.2% | 3.92 | 719 |
+| Bollinger Breakout (raw) | 1998 | 14.5% | -65.2% | 0.22 | 0.61 | 88.5% | 17.6 | 43.1% | 2.87 | 878 |
+| 100-Day High (raw) | 1998 | 16.3% | -74.0% | 0.22 | 0.66 | 94.1% | 18.9 | 43.0% | 3.73 | 514 |
+| TechTrader (filtered) | 1998 | 14.4% | -66.1% | 0.22 | 0.67 | 80.8% | 15.8 | 29.1% | 4.63 | 1180 |
+| Moving Avg Channel (raw) | 1998 | 14.1% | -64.9% | 0.22 | 0.61 | 96.6% | 19.4 | 37.0% | 4.18 | 847 |
 | Buy & Hold — Sensex (full window, price-only) | 1998 | 12.6% | -60.9% | 0.21 | 0.57 | — | — | — | — | 0 |
-| 20% Flipper (filtered) | 1998 | 10.0% | -52.3% | 0.19 | 0.53 | 63.0% | 12.6 | 37.8% | 2.50 | 2022 |
-| TechTrader (raw) | 1998 | 12.9% | -67.5% | 0.19 | 0.59 | 89.2% | 17.5 | 29.1% | 4.01 | 1355 |
+| TechTrader (raw) | 1998 | 14.4% | -69.2% | 0.21 | 0.65 | 89.7% | 17.6 | 30.7% | 4.35 | 1321 |
+| Moving Avg Channel (filtered) | 1998 | 13.6% | -67.2% | 0.20 | 0.57 | 87.5% | 17.5 | 40.3% | 3.26 | 837 |
+| 20% Flipper (filtered) | 1998 | 10.4% | -51.8% | 0.20 | 0.55 | 63.2% | 12.6 | 37.5% | 2.44 | 2025 |
 | Buy & Hold — Nifty 500 | 2005 | 11.9% | -64.3% | 0.18 | 0.58 | — | — | — | — | 0 |
-| Moving Avg Channel (raw) | 1998 | 11.6% | -63.0% | 0.18 | 0.51 | 96.0% | 19.3 | 38.1% | 3.28 | 837 |
-| TechTrader (filtered) | 1998 | 11.3% | -61.8% | 0.18 | 0.55 | 80.6% | 15.7 | 28.7% | 3.92 | 1184 |
-| 100-Day High (raw) | 1998 | 13.2% | -77.0% | 0.17 | 0.55 | 93.3% | 18.8 | 42.4% | 3.13 | 517 |
-| Moving Avg Channel (filtered) | 1998 | 9.1% | -66.2% | 0.14 | 0.40 | 88.1% | 17.5 | 38.7% | 2.78 | 831 |
-| 52-Week High (raw) | 1998 | 10.6% | -77.9% | 0.14 | 0.45 | 94.5% | 18.6 | 43.5% | 3.42 | 230 |
-| 20% Flipper (raw) | 1998 | 7.3% | -66.0% | 0.11 | 0.30 | 94.9% | 19.0 | 34.3% | 2.43 | 2048 |
-| TrendPilot (filtered) | 1998 | 7.8% | -74.5% | 0.11 | 0.34 | 87.4% | 17.2 | 33.5% | 3.16 | 853 |
-| TrendPilot (raw) | 1998 | 7.2% | -76.3% | 0.09 | 0.29 | 97.2% | 19.6 | 33.1% | 3.33 | 1023 |
+| 20% Flipper (raw) | 1998 | 10.7% | -65.1% | 0.16 | 0.42 | 95.0% | 19.0 | 34.0% | 2.64 | 2058 |
+| 52-Week High (raw) | 1998 | 10.0% | -72.1% | 0.14 | 0.43 | 95.6% | 18.9 | 43.4% | 4.44 | 226 |
+| TrendPilot (filtered) | 1998 | 10.4% | -76.2% | 0.14 | 0.43 | 88.0% | 17.2 | 33.6% | 3.59 | 842 |
+| TrendPilot (raw) | 1998 | 8.0% | -79.6% | 0.10 | 0.30 | 97.6% | 19.6 | 32.3% | 3.80 | 1031 |
 
 > **What is held constant vs not.** The comparison fixes the *data* (same
 > survivorship-aware adjusted-OHLC panels and causal-repair), *costs*, *point-in-time

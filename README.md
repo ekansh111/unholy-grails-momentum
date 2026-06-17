@@ -16,30 +16,40 @@ costs and accounting.
 
 ## TL;DR findings
 
-| | S&P 500 (1996–2026) | Nifty 500 (1998–2026) |
+| | S&P 500 (1996–2026) | Nifty 500 (1998–2026)¹ |
 |---|---|---|
 | **Buy & Hold** | 10.5% · −55% · MAR 0.19 | 12.6% · −61% · MAR 0.21 (Sensex, full window) |
-| **Best Unholy Grails (by MAR)** | TrendPilot+filter 19.9% · −42% · **0.47** | 100-Day High+filter 16.3% · −40% · **0.41** |
-| **Clenow — book (uncapped, ~22–31 names)** | 10.3% · −33% · 0.32 | 21.9% · −39% · 0.56 (Sharpe 1.20) |
+| **Best Unholy Grails (by MAR)** | TrendPilot+filter 19.9% · −42% · **0.47** | 52-Wk High+filter 16.7% · −32% · **0.52** |
+| **Clenow — book (uncapped, ~22–31 names)** | 10.3% · −33% · 0.32 | 21.9% · −39% · **0.56 (Sharpe 1.20)** |
 | **Clenow — 20-position cap (like-for-like)** | 7.6% · −25% · 0.30 | 11.0% · −19% · **0.59 (Sharpe 1.11)** |
+
+¹ India runs use the **Clenow cleaning pipeline** so both systems see bit-for-bit identical
+prices (see finding 4). The repo's stricter default cleaning gives India CAGRs ~3 pp lower.
 
 1. **The index filter is the single biggest win — confirmed on both markets, decades after
    the book.** A 75-day index filter slashes drawdowns everywhere (52-Week High on Nifty 500:
-   **−78% → −34%**; S&P 500: −45% → −28%) and usually lifts MAR. In volatile India it often
+   **−72% → −32%**; S&P 500: −45% → −28%) and usually lifts MAR. In volatile India it often
    *raises* CAGR too, because dodging the −60% bears protects compounding.
-2. **Much of Clenow's headline edge was diversification, not signal.** Clenow's book profile
-   is *uncapped* and holds ~22 (US) / ~31 (India) names. Cap it to the same **20 positions**
-   as Unholy Grails and its India CAGR collapses **21.9% → 11.0%** — *below* the best filtered
-   breakout systems (16%). What survives capping is Clenow's *risk-adjusted smoothness*
-   (MAR 0.56–0.59, Sharpe ~1.1–1.2) from volatility-normalised position sizing — a genuine,
-   structural edge in high-dispersion India.
+2. **Equalise the comparison and Clenow's India "dominance" mostly evaporates.** Two things
+   inflated it: (a) *position count* — Clenow's book profile is uncapped (~31 India names);
+   cap it to 20 and its India CAGR collapses **21.9% → 11.0%**; and (b) *data cleaning* — once
+   the Unholy Grails panel uses the **same cleaning** as the Clenow baseline (finding 4), the
+   best filtered breakout (52-Wk High, **MAR 0.52**) nearly ties Clenow uncapped (0.56). The
+   gap that looked like 0.41-vs-0.56 across mismatched cleaning is really ~0.52-vs-0.56.
 3. **In the US the simple book systems win outright.** TrendPilot+filter (MAR 0.47) and
    several filtered breakouts beat *both* Clenow variants (MAR 0.30–0.32) on the calm,
-   low-dispersion S&P 500. Sophistication earns its keep only where dispersion is high.
-4. **No single strategy wins everywhere.** TrendPilot tops the US but is among the *worst*
+   low-dispersion S&P 500. What survives for Clenow on both markets is *risk-adjusted
+   smoothness* (higher Sharpe) from volatility-normalised sizing — a real but narrow edge.
+4. **Data cleaning is itself a result on NSE data.** Clenow's "sophisticated" cleaning works
+   on the adjusted close *alone* and only caps daily ratios, so it leaves corrupt
+   single-day spikes partly intact (PFC's bogus +300% day: **15× residual** vs reality);
+   this repo's raw-anchored `factor_repair` fixes it fully (**4×**, matching the raw price).
+   The India tables use Clenow's cleaning for an apples-to-apples *comparison*; the stricter
+   repair is the more honest *absolute* number. Either way the rankings hold.
+5. **No single strategy wins everywhere.** TrendPilot tops the US but is among the *worst*
    in India (a per-stock 200-day MA whipsaws in Indian volatility). The 20% Flipper's fixed
    thresholds suit neither large-cap market well.
-5. **Win rate is irrelevant to profit, exactly as the book claims.** The best systems win
+6. **Win rate is irrelevant to profit, exactly as the book claims.** The best systems win
    37–50% of trades; they profit from a high payoff ratio (avg win ≫ avg loss) on long-held
    winners, not from being right often.
 
@@ -150,9 +160,14 @@ docs/STRATEGY_SPEC.md   exact book rules + adaptations
 - **India Buy & Hold window.** The Nifty 500 total-return index (`CRSLDX`) only begins
   **2005**, so its B&H row is over a shorter window; RESULTS.md also shows a **full-window
   Sensex** (1998+, price-only) B&H row, and tags every row with its start year.
-- **NSE adjusted-price quality** is imperfect. The causal-repair step removes corrupt
-  single-day adjustment spikes, but subtler issues may remain — treat India *absolute*
-  CAGRs as approximate and weight the *relative* ordering and the filter effect more.
+- **NSE adjusted-price quality** is imperfect, and the *cleaning method matters*. The repo
+  ships two: `factor_repair` (raw-anchored — fully fixes corrupt single-day adjustment
+  spikes by cross-checking the raw close) and `clenow` (the baseline's pipeline — quarantine
+  + isolated-spike repair + daily-ratio cap, working on the adjusted close alone). The India
+  configs use **`clenow`** so the comparison is bit-for-bit fair against the Clenow baseline;
+  it is the *less* strict of the two, so the India absolute CAGRs are a shared upper bound
+  (`factor_repair` is ~3 pp lower). Treat India *levels* as approximate; the ordering and the
+  filter effect are robust to the choice.
 - **Delisting exits** use the last traded price with no bankruptcy haircut (the book's
   convention, shared by the Clenow baseline) — an optimistic, symmetric assumption.
 - **TechTrader** rules 2 & 4 ("price < \$10", AUD turnover floor) are ASX small-cap

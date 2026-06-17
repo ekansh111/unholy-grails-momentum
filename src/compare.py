@@ -260,10 +260,16 @@ def build():
         ranked = df.sort_values("MAR", ascending=False)
         ug = df[df["kind"].str.startswith("UG")]
         span = f"{ug['start'].min()} → {ug['end'].max()}"
+        cleaning = cfg.get("cleaning", "factor_repair")
+        clean_note = (" Prices use the **Clenow cleaning pipeline** (matched to the baseline "
+                      "bit-for-bit; see the data-quality note in the README — it is *less* "
+                      "aggressive than this repo's stricter `factor_repair`, so these India "
+                      "levels are a shared upper bound)." if cleaning == "clenow" else "")
         sections.append(
             f"## {market.upper()} — {cfg['benchmark_name']} universe, strategies {span}\n\n"
             f"Sorted by MAR (risk-adjusted return = CAGR / |MaxDD|). 'From' = the year each\n"
-            f"row's scored series begins (note the India report benchmark only starts 2005).\n\n"
+            f"row's scored series begins (note the India report benchmark only starts 2005)."
+            f"{clean_note}\n\n"
             + md_table(ranked) + "\n\n" + DISCLOSURE
             + f"\n\n![scatter](outputs/{market}/scatter.png)\n"
             + f"![equity](outputs/{market}/equity.png)\n"
