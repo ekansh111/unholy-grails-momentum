@@ -1,0 +1,25 @@
+# S&P 500 market config. Data + costs + benchmarks identical to the Clenow
+# baseline (clenowMomentum/config.yaml) so the comparison is apples-to-apples.
+market: us
+currency: "$"
+
+data_dir: /Users/ekanshgowda/Documents/Code/clenowMomentum/data/raw/prices
+constituents_file: /Users/ekanshgowda/Documents/Code/clenowMomentum/data/raw/constituents/sp500Historical.csv
+regime_symbol: GSPC.INDX          # S&P 500 price index — regime/index filter (75d SMA)
+report_symbol: SP500TR.INDX       # S&P 500 Total Return — Buy & Hold benchmark
+benchmark_name: "S&P 500 (TR)"
+regime_name: "S&P 500"
+drop_sentinels: []
+
+# Comparison window: clean fja05680 change-row universe begins 1996-01-02.
+start_date: "1996-01-02"
+end_date: "2026-06-16"
+
+# Accounting — matches Clenow US book config exactly.
+initial_capital: 100000
+slippage_bps: 5
+commission_per_trade: 1.0
+
+# Portfolio
+max_positions: 20
+liquidity_floor: 1000000          # $1M 21-day avg turnover floor (book: $500k AUD)

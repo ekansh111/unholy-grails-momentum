@@ -1,0 +1,24 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Data (large, EODHD/NSE-derived — not redistributed; see README for sourcing)
+data/
+*.parquet
+*.feather
+
+# Bulky / regenerable outputs — but DO keep the showcase charts, RESULTS.md,
+# summary.csv and comparison.csv so the README renders on GitHub.
+outputs/**/equity/
+outputs/clenow/*_equity.csv
+outputs/**/montecarlo_*.csv
+outputs/*.log
+
+# OS / editor
+.DS_Store
+.env
+.idea/
+.vscode/

@@ -1,0 +1,13 @@
+{
+  "market": "us",
+  "variant": "book (uncapped)",
+  "start": "1996-01-02",
+  "end": "2026-06-16",
+  "final_equity": 1996428.4267127856,
+  "avg_positions": 21.774500848231764,
+  "max_positions_held": 51,
+  "closed_episodes": 3178,
+  "win_rate": 0.487413467589679,
+  "n_fills": 15622,
+  "total_commission": 15622.0
+}

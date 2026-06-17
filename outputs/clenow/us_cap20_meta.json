@@ -1,0 +1,13 @@
+{
+  "market": "us",
+  "variant": "20-position cap",
+  "start": "1996-01-02",
+  "end": "2026-06-16",
+  "final_equity": 922707.9039937572,
+  "avg_positions": 16.2920527208665,
+  "max_positions_held": 21,
+  "closed_episodes": 2303,
+  "win_rate": 0.47894051237516283,
+  "n_fills": 12555,
+  "total_commission": 12555.0
+}

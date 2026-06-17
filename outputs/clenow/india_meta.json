@@ -1,0 +1,13 @@
+{
+  "market": "india",
+  "variant": "book (uncapped)",
+  "start": "1998-09-01",
+  "end": "2026-04-30",
+  "final_equity": 236544867.05959123,
+  "avg_positions": 30.81517623070201,
+  "max_positions_held": 68,
+  "closed_episodes": 4541,
+  "win_rate": 0.4677383836159436,
+  "n_fills": 22344,
+  "total_commission": 446880.0
+}
