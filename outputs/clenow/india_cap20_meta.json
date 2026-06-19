@@ -3,11 +3,11 @@
   "variant": "20-position cap",
   "start": "1998-09-01",
   "end": "2026-04-30",
-  "final_equity": 17903309.499324147,
-  "avg_positions": 15.587678415380134,
+  "final_equity": 16515768.109673614,
+  "avg_positions": 15.627876492863384,
   "max_positions_held": 21,
-  "closed_episodes": 2076,
-  "win_rate": 0.476878612716763,
-  "n_fills": 11473,
-  "total_commission": 229460.0
+  "closed_episodes": 2036,
+  "win_rate": 0.48330058939096265,
+  "n_fills": 11430,
+  "total_commission": 228600.0
 }

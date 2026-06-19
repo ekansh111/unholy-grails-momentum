@@ -19,8 +19,7 @@ from engine import run_backtest
 from metrics import summarize
 from universe import Universe
 
-MARKETS = {"us": "config/us.yaml", "india": "config/india.yaml",
-           "india_clean": "config/india_clean.yaml"}
+MARKETS = {"us": "config/us.yaml", "india": "config/india.yaml"}
 
 
 def run_market(market: str) -> pd.DataFrame:
@@ -70,7 +69,7 @@ def run_market(market: str) -> pd.DataFrame:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--market", choices=["us", "india", "india_clean", "both"], default="both")
+    ap.add_argument("--market", choices=["us", "india", "both"], default="both")
     args = ap.parse_args()
     markets = ["us", "india"] if args.market == "both" else [args.market]
     for mk in markets:

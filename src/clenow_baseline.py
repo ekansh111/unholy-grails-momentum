@@ -26,9 +26,10 @@ OUT_DIR = os.path.join(REPO_ROOT, "outputs", "clenow")
 # Match the Unholy Grails comparison windows exactly.
 MARKETS = {
     "us": {"config": "config.yaml", "start": "1996-01-02", "end": "2026-06-16"},
-    "india": {"config": "configNiftyBook.yaml", "start": "1998-09-01", "end": "2026-04-30"},
-    "india_clean": {"config": "configNiftyBook.yaml", "start": "1998-09-01", "end": "2026-04-30",
-                    "cachedir": "/Users/ekanshgowda/Documents/Code/clenowMomentum/data/raw/pricesNseClean"},
+    # India reads the REBUILT clean panel (see config/india.yaml), so the Clenow
+    # baseline and the Unholy Grails strategies see identical prices.
+    "india": {"config": "configNiftyBook.yaml", "start": "1998-09-01", "end": "2026-04-30",
+              "cachedir": "/Users/ekanshgowda/Documents/Code/clenowMomentum/data/raw/pricesNseClean"},
 }
 
 
@@ -102,7 +103,7 @@ def run(market: str):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--market", choices=["us", "india", "india_clean", "both"], default="both")
+    ap.add_argument("--market", choices=["us", "india", "both"], default="both")
     args = ap.parse_args()
     markets = ["us", "india"] if args.market == "both" else [args.market]
     for mk in markets:

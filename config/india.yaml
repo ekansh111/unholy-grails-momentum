@@ -3,7 +3,13 @@
 market: india
 currency: "Rs"
 
-data_dir: /Users/ekanshgowda/Documents/Code/clenowMomentum/data/raw/pricesNse
+# Canonical India source = the properly REBUILT dataset (tools/rebuild_nse_clean.py):
+# raw bhavcopy + a corporate-action calendar cross-validated across NSE-official and
+# yfinance (price drop as final arbiter) + systematic-data-break repair. This
+# supersedes the in-loader cleaning modes, which only patch the corrupt vendor
+# adjClose; the rebuild reconstructs it correctly. Generate it with the tool, then
+# point here. (Falls back to .../pricesNse + cleaning: clenow if not yet built.)
+data_dir: /Users/ekanshgowda/Documents/Code/clenowMomentum/data/raw/pricesNseClean
 constituents_file: /Users/ekanshgowda/Documents/Code/clenowMomentum/data/raw/constituents/nifty500Historical.csv
 regime_symbol: BSESN.INDX         # Sensex — regime/index filter (75d SMA); history from 1997
 report_symbol: CRSLDX.INDX        # Nifty 500 index — Buy & Hold benchmark; data from 2005 only
@@ -11,11 +17,7 @@ benchmark_name: "Nifty 500"
 regime_name: "Sensex"
 drop_sentinels: ["#N/A"]          # NSE change-row blob carries a junk sentinel as first ticker
 
-# Price cleaning: "clenow" = the Clenow baseline's exact pipeline (quarantine
-# shape-corrupted series + isolated-spike repair + daily-ratio cap), so the UG
-# panel matches the Clenow-India baseline bit-for-bit (the fairest comparison on
-# imperfect NSE data). "factor_repair" = this repo's raw-anchored repair.
-cleaning: clenow
+cleaning: none                    # data already rebuilt clean upstream; use adjClose as-is
 
 # Comparison window: Nifty 500 change-row universe begins 1998-08.
 start_date: "1998-09-01"

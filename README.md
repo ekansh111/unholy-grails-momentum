@@ -19,33 +19,39 @@ costs and accounting.
 | | S&P 500 (1996–2026) | Nifty 500 (1998–2026)¹ |
 |---|---|---|
 | **Buy & Hold** | 10.5% · −55% · MAR 0.19 | 12.6% · −61% · MAR 0.21 (Sensex, full window) |
-| **Best Unholy Grails (by MAR)** | TrendPilot+filter 19.9% · −42% · **0.47** | 52-Wk High+filter 16.7% · −32% · **0.52** |
-| **Clenow — book (uncapped, ~22–31 names)** | 10.3% · −33% · 0.32 | 21.9% · −39% · **0.56 (Sharpe 1.20)** |
-| **Clenow — 20-position cap (like-for-like)** | 7.6% · −25% · 0.30 | 11.0% · −19% · **0.59 (Sharpe 1.11)** |
+| **Best Unholy Grails (by MAR)** | TrendPilot+filter 19.9% · −42% · **0.47** | 52-Wk High+filter 18.0% · −28% · **0.64** |
+| **Clenow — book (uncapped, ~22–31 names)** | 10.3% · −33% · 0.32 | 21.0% · −42% · 0.50 |
+| **Clenow — 20-position cap (like-for-like)** | 7.6% · −25% · 0.30 | 10.7% · −18% · 0.58 |
 
-¹ India runs use the **Clenow cleaning pipeline** so both systems see bit-for-bit identical
-prices (see finding 4). The repo's stricter default cleaning gives India CAGRs ~3 pp lower.
+¹ India uses a properly **rebuilt** price panel — raw bhavcopy back-adjusted with a corporate-
+action calendar cross-validated across NSE-official and yfinance (`tools/rebuild_nse_clean.py`),
+fixing catastrophic vendor over-adjustment. This **materially changed the India result** — see
+finding 2. (US uses EODHD, which is clean.)
 
 1. **The index filter is the single biggest win — confirmed on both markets, decades after
    the book.** A 75-day index filter slashes drawdowns everywhere (52-Week High on Nifty 500:
-   **−72% → −32%**; S&P 500: −45% → −28%) and usually lifts MAR. In volatile India it often
+   **−72% → −28%**; S&P 500: −45% → −28%) and usually lifts MAR. In volatile India it often
    *raises* CAGR too, because dodging the −60% bears protects compounding.
-2. **Equalise the comparison and Clenow's India "dominance" mostly evaporates.** Two things
-   inflated it: (a) *position count* — Clenow's book profile is uncapped (~31 India names);
-   cap it to 20 and its India CAGR collapses **21.9% → 11.0%**; and (b) *data cleaning* — once
-   the Unholy Grails panel uses the **same cleaning** as the Clenow baseline (finding 4), the
-   best filtered breakout (52-Wk High, **MAR 0.52**) nearly ties Clenow uncapped (0.56). The
-   gap that looked like 0.41-vs-0.56 across mismatched cleaning is really ~0.52-vs-0.56.
-3. **In the US the simple book systems win outright.** TrendPilot+filter (MAR 0.47) and
-   several filtered breakouts beat *both* Clenow variants (MAR 0.30–0.32) on the calm,
-   low-dispersion S&P 500. What survives for Clenow on both markets is *risk-adjusted
-   smoothness* (higher Sharpe) from volatility-normalised sizing — a real but narrow edge.
-4. **Data cleaning is itself a result on NSE data.** Clenow's "sophisticated" cleaning works
-   on the adjusted close *alone* and only caps daily ratios, so it leaves corrupt
-   single-day spikes partly intact (PFC's bogus +300% day: **15× residual** vs reality);
-   this repo's raw-anchored `factor_repair` fixes it fully (**4×**, matching the raw price).
-   The India tables use Clenow's cleaning for an apples-to-apples *comparison*; the stricter
-   repair is the more honest *absolute* number. Either way the rankings hold.
+2. **The index-filtered breakouts win on *both* markets — once the data is clean.** The best
+   filtered Unholy Grails system beats *both* Clenow variants on risk-adjusted return in the
+   US (TrendPilot+filter MAR 0.47 vs 0.30–0.32) **and** in India (52-Wk High+filter **0.64**
+   vs Clenow 0.50 uncapped / 0.58 capped). Clenow's *earlier-apparent* India dominance was
+   largely a **data-corruption artifact**: the vendor's broken NSE adjustments inflated
+   Clenow (its momentum rank loaded up on fabricated multibaggers like CUB's bogus 12,667×)
+   while injecting fake −50% "crashes" that penalised the breakouts. Rebuild the data
+   (finding 4) and the result flips.
+3. **Clenow's one durable edge is smoothness, not return.** Its volatility-normalised sizing
+   gives the lowest drawdown anywhere (India 20-cap: −18%), so it wins on Sharpe — a real but
+   narrow edge that does not translate into a risk-adjusted-return (MAR) lead once the data
+   is trustworthy.
+4. **The India data had to be rebuilt — and that's a result in itself.** The NSE vendor
+   `adjClose` was catastrophically over-adjusted (a corporate-action file ~54% of whose
+   bonus/split entries are spurious → fabricated multibaggers), plus a *systematic* doubling
+   error on 2024-11-04 affecting 22 blue-chips (HDFCBANK, NESTLÉ, WIPRO…). The rebuild
+   reconstructs `adjClose` from raw bhavcopy + a CA calendar cross-validated across NSE-official
+   and yfinance (they agree on the factor **96.8%** of the time), with the raw price drop as
+   final arbiter, and detects the systematic break. Multiples now match reality (PFC 10×,
+   TITAN 715×, HDFCBANK 518×).
 5. **No single strategy wins everywhere.** TrendPilot tops the US but is among the *worst*
    in India (a per-stock 200-day MA whipsaws in Indian volatility). The 20% Flipper's fixed
    thresholds suit neither large-cap market well.
@@ -86,11 +92,13 @@ bearish — the book's key risk-control overlay.
 The whole point is apples-to-apples, so Unholy Grails and Clenow share everything
 except the trading rule:
 
-- **Same data:** survivorship-aware, dividend/split-adjusted OHLC from the
-  [clenowMomentum](.) project's panels — 1,100+ US symbols (incl. delisted names like
-  AAMRQ, ABS) and 1,380+ NSE symbols. Adjusted OHLC is derived as `raw × adjClose/close`,
-  with a **causal repair** step that fixes corrupt single-day adjustment spikes (a real
-  NSE-data hazard — see [docs/STRATEGY_SPEC.md](docs/STRATEGY_SPEC.md) and `src/data.py`).
+- **Same data:** survivorship-aware, adjusted OHLC — 1,100+ US symbols (incl. delisted
+  names like AAMRQ, ABS) and 1,380+ NSE symbols. **US** uses EODHD (clean). **India** uses
+  a *rebuilt* panel (`tools/rebuild_nse_clean.py`): raw bhavcopy back-adjusted with a
+  corporate-action calendar **cross-validated across NSE-official and yfinance** (price drop
+  as final arbiter) plus systematic-data-break repair — because the raw vendor `adjClose` is
+  catastrophically over-adjusted (see [docs/NSE_DATA_REBUILD.md](docs/NSE_DATA_REBUILD.md)).
+  Both systems read the same rebuilt India panel.
 - **Same point-in-time universe:** index membership from the change-row constituent
   files (`constituentsOn(date)`), so a stock is only tradable while it was actually in
   the index.
@@ -160,14 +168,14 @@ docs/STRATEGY_SPEC.md   exact book rules + adaptations
 - **India Buy & Hold window.** The Nifty 500 total-return index (`CRSLDX`) only begins
   **2005**, so its B&H row is over a shorter window; RESULTS.md also shows a **full-window
   Sensex** (1998+, price-only) B&H row, and tags every row with its start year.
-- **NSE adjusted-price quality** is imperfect, and the *cleaning method matters*. The repo
-  ships two: `factor_repair` (raw-anchored — fully fixes corrupt single-day adjustment
-  spikes by cross-checking the raw close) and `clenow` (the baseline's pipeline — quarantine
-  + isolated-spike repair + daily-ratio cap, working on the adjusted close alone). The India
-  configs use **`clenow`** so the comparison is bit-for-bit fair against the Clenow baseline;
-  it is the *less* strict of the two, so the India absolute CAGRs are a shared upper bound
-  (`factor_repair` is ~3 pp lower). Treat India *levels* as approximate; the ordering and the
-  filter effect are robust to the choice.
+- **NSE data was rebuilt — but a residual tail remains.** The vendor `adjClose` was unusable
+  (54%-spurious corporate-action file + a systematic 2024-11-04 doubling error), so India runs
+  on the reconstruction in `tools/rebuild_nse_clean.py` ([writeup](docs/NSE_DATA_REBUILD.md)).
+  It adjusts 527 names (339 cross-validated by both NSE and yfinance); ~88 names still carry a
+  >100% one-day residual — mostly **mid-series multi-year gaps** (harmless; the engine won't
+  trade across them) and **pre-2006 bonuses** NSE's archive predates. These are flagged in the
+  audit and left *unadjusted* rather than risk mis-labeling a real crash as a bonus. Treat
+  India *levels* as good-not-perfect; the ordering and filter effect are robust.
 - **Delisting exits** use the last traded price with no bankruptcy haircut (the book's
   convention, shared by the Clenow baseline) — an optimistic, symmetric assumption.
 - **TechTrader** rules 2 & 4 ("price < \$10", AUD turnover floor) are ASX small-cap
