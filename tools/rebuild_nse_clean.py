@@ -93,9 +93,9 @@ def _trim_leading_stubs(df):
     dates = df["date"].to_numpy()
     n = len(df)
     start = 0
-    for t in range(1, min(40, n)):
+    for t in range(1, min(80, n)):
         gap = (pd.Timestamp(dates[t]) - pd.Timestamp(dates[t - 1])).days
-        if gap > 150 and (t - start) < 20:     # small segment then a big gap = stub
+        if gap > 730 or (gap > 150 and (t - start) < 25):   # multi-year gap, or small stub then a gap
             start = t
     return df.iloc[start:].reset_index(drop=True) if start > 0 else df
 
