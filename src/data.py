@@ -234,7 +234,9 @@ def _clean_adjusted_close_clenow(adj: np.ndarray) -> np.ndarray:
 def _derive_adjusted(df: pd.DataFrame, cleaning: str = "factor_repair") -> pd.DataFrame:
     close = df["close"].to_numpy(dtype=float)
     adj_raw = df["adjClose"].to_numpy(dtype=float)
-    if cleaning == "clenow":
+    if cleaning == "none":
+        adj = adj_raw                # data already cleaned upstream (e.g. pricesNseClean)
+    elif cleaning == "clenow":
         adj = _clean_adjusted_close_clenow(adj_raw)
     else:  # "factor_repair" — raw-anchored causal repair (this repo's default)
         adj = _repair_adjusted_close(close, adj_raw)

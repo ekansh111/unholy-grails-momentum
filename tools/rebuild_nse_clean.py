@@ -50,6 +50,42 @@ def _snap(r):
     return MAJOR[j], abs(r / MAJOR[j] - 1.0)
 
 
+def find_systematic_breaks(files, min_names=6):
+    """Detect dates where >=min_names unrelated stocks share a PERSISTENT clean
+    price-level step (~x0.5, x2, etc.) — a systematic bhavcopy data error (a
+    price-basis break), NOT a corporate action. Returns {symbol: [date, ...]} so
+    each affected name's step can be back-adjusted away. The proven case:
+    2024-11-04, where 22 names' pre-date history is doubled vs the real price."""
+    from collections import defaultdict
+    date_hits = defaultdict(list)
+    for p in files:
+        if "INDX" in os.path.basename(p):
+            continue
+        try:
+            d = pd.read_parquet(p, columns=["date", "close"])
+        except Exception:
+            continue
+        d["date"] = pd.to_datetime(d["date"]); d = d.sort_values("date").reset_index(drop=True)
+        c = d["close"].to_numpy(dtype=float); n = len(c)
+        if n < 12:
+            continue
+        sym = os.path.basename(p)[:-8].replace("_", ".")
+        for t in range(5, n - 5):
+            if c[t - 1] <= 0:
+                continue
+            r = c[t] / c[t - 1]
+            if 0.3 < r < 0.62 or 1.6 < r < 3.4:
+                pre = np.median(c[t - 5:t]); post = np.median(c[t:t + 5])
+                if pre > 0 and 0.85 < (post / pre) / r < 1.15:    # the step persists
+                    date_hits[d["date"].iloc[t].date()].append(sym)
+    out = defaultdict(list)
+    for dt, syms in date_hits.items():
+        if len(syms) >= min_names:
+            for sym in syms:
+                out[sym].append(dt)
+    return out
+
+
 def _trim_leading_stubs(df):
     """Drop leading 'stub' bars — a tiny isolated cluster of old bars separated
     from the real series by a multi-year gap (a bhavcopy artifact that otherwise
@@ -229,6 +265,13 @@ def main():
     cal = _load_calendar(args.nse, args.yf, args.legacy)
     print(f"calendar: {len(cal)} tickers with candidate CAs", flush=True)
     files = sorted(glob.glob(os.path.join(args.src, "*.parquet")))
+    sysbreaks = find_systematic_breaks(files)
+    for sym, dts in sysbreaks.items():
+        for dt in dts:
+            cal[sym].append({"ex": dt, "f": None, "src": "systematic", "win": 3})
+    n_sb = sum(len(v) for v in sysbreaks.values())
+    print(f"systematic bhavcopy data-breaks: {n_sb} across {len(sysbreaks)} names "
+          f"(e.g. {sorted(sysbreaks)[:5]})", flush=True)
     rows = []
     for k, p in enumerate(files):
         try:

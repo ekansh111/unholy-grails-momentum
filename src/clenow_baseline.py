@@ -27,6 +27,8 @@ OUT_DIR = os.path.join(REPO_ROOT, "outputs", "clenow")
 MARKETS = {
     "us": {"config": "config.yaml", "start": "1996-01-02", "end": "2026-06-16"},
     "india": {"config": "configNiftyBook.yaml", "start": "1998-09-01", "end": "2026-04-30"},
+    "india_clean": {"config": "configNiftyBook.yaml", "start": "1998-09-01", "end": "2026-04-30",
+                    "cachedir": "/Users/ekanshgowda/Documents/Code/clenowMomentum/data/raw/pricesNseClean"},
 }
 
 
@@ -78,6 +80,8 @@ def run(market: str):
         base = loadConfig(spec["config"])
         base["backtest"]["startDate"] = spec["start"]
         base["backtest"]["endDate"] = spec["end"]
+        if spec.get("cachedir"):
+            base["data"]["cacheDir"] = spec["cachedir"]
         # 1) Clenow as the book defines it (uncapped, buys down the ranking).
         _run_one(loadPanel, computeIndicators, runBacktest, parseDate, base,
                  "book (uncapped)", "", market)
@@ -86,6 +90,8 @@ def run(market: str):
         capped = loadConfig(spec["config"])
         capped["backtest"]["startDate"] = spec["start"]
         capped["backtest"]["endDate"] = spec["end"]
+        if spec.get("cachedir"):
+            capped["data"]["cacheDir"] = spec["cachedir"]
         capped.setdefault("portfolio", {})["maxPositions"] = 20
         _run_one(loadPanel, computeIndicators, runBacktest, parseDate, capped,
                  "20-position cap", "cap20", market)
@@ -96,7 +102,7 @@ def run(market: str):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--market", choices=["us", "india", "both"], default="both")
+    ap.add_argument("--market", choices=["us", "india", "india_clean", "both"], default="both")
     args = ap.parse_args()
     markets = ["us", "india"] if args.market == "both" else [args.market]
     for mk in markets:
