@@ -89,25 +89,30 @@ def find_systematic_breaks(files, min_names=6):
 def _strip_phantom_calendar_rows(df):
     """Remove non-trading-day artifacts the upstream bhavcopy/yfinance assembler
     injects (they flow in verbatim from the per-ticker cache):
-      * Sunday-dated bars — NSE NEVER trades on a Sunday, so every such row is
-        spurious. The 2024 yfinance recent-gap fill duplicated each prior Friday
-        onto ~8 Sundays (Jul-Oct 2024) across ~940 names; left in, they inject
-        spurious 0%-return bars into every momentum lookback.
-      * Saturday bars that merely duplicate the prior bar (genuine Saturday budget
-        sessions carry distinct prices and are kept).
-      * zero-OHLC bars (open=high=low=0 with a valid close) -> set O/H/L = close, so
-        the bar's true range is 0 rather than a fabricated prevClose-sized spike
-        that corrupts ATR / position sizing.
+      * weekend (Sat/Sun) bars that merely DUPLICATE the prior bar — the 2024
+        yfinance recent-gap fill duplicated each prior Friday onto ~8 Sundays
+        (Jul-Oct 2024) across ~940 names; left in, they inject spurious 0%-return
+        bars into every momentum lookback. Genuine special weekend sessions (the
+        Sat 2025-02-01 and Sun 2026-02-01 Union-Budget live sessions) carry
+        distinct prices and are KEPT — so a future real weekend session is never
+        silently dropped.
+      * zero / non-positive OHLC fields with a valid close -> clamp them into the
+        close and re-derive high/low as the row max/min, so the bar's true range
+        is sane instead of a fabricated prevClose-sized spike that corrupts ATR.
     df must already be date-sorted. Returns the cleaned, re-indexed frame."""
     d = df
     dow = d["date"].dt.dayofweek
     ohlcv = [c for c in ("open", "high", "low", "close", "volume") if c in d.columns]
     dup_prev = d[ohlcv].eq(d[ohlcv].shift()).all(axis=1) if ohlcv else False
-    d = d[~((dow == 6) | ((dow == 5) & dup_prev))].reset_index(drop=True)
+    d = d[~(dow.isin([5, 6]) & dup_prev)].reset_index(drop=True)
     if {"open", "high", "low", "close"}.issubset(d.columns):
-        z = (d["open"] == 0) & (d["high"] == 0) & (d["low"] == 0) & (d["close"] > 0)
-        if z.any():
-            d.loc[z, ["open", "high", "low"]] = d.loc[z, ["close", "close", "close"]].values
+        bad = (d["close"] > 0) & ((d["open"] <= 0) | (d["high"] <= 0) | (d["low"] <= 0))
+        if bad.any():
+            for col in ("open", "high", "low"):
+                m = bad & (d[col] <= 0)
+                d.loc[m, col] = d.loc[m, "close"]
+            d.loc[bad, "high"] = d.loc[bad, ["open", "high", "low", "close"]].max(axis=1)
+            d.loc[bad, "low"] = d.loc[bad, ["open", "high", "low", "close"]].min(axis=1)
     return d
 
 
@@ -321,7 +326,11 @@ def main():
     # missing bars, so surface it loudly + write the stranded list for a re-fetch.
     ld = pd.to_datetime(au["last_date"])
     gmax = ld.max()
-    recent = ld[ld < (gmax - pd.Timedelta(days=120))].dt.date.value_counts()
+    # >=30 days before the latest bar is enough: a real refresh cliff strands many
+    # names on the SAME exact date, which scattered illiquid tails never do, so the
+    # short window catches recent cliffs without false-firing. (Cliffs of <30 names
+    # are below the cluster threshold and won't be flagged here.)
+    recent = ld[ld < (gmax - pd.Timedelta(days=30))].dt.date.value_counts()
     clustered = recent[recent >= 30]                  # >=30 names sharing one date = a refresh cliff
     if len(clustered):
         cliff_dates = set(clustered.index)

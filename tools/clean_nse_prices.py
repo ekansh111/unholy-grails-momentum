@@ -84,26 +84,36 @@ def _repair_isolated_spikes(px: np.ndarray, passes: int = 5):
 
 def _strip_phantom_calendar_rows(df: pd.DataFrame) -> pd.DataFrame:
     """Remove non-trading-day artifacts carried in verbatim from the per-ticker
-    cache: Sunday-dated rows (NSE never trades Sunday — the 2024 yfinance gap-fill
-    duplicated each prior Friday onto ~8 Sundays across ~940 names), Saturday rows
-    that merely duplicate the prior bar (real Sat budget sessions are kept), and
-    zero-OHLC bars (open=high=low=0 with a valid close -> set O/H/L = close, so the
-    bar's true range is 0 instead of a fabricated prevClose spike that corrupts ATR).
+    cache: weekend (Sat/Sun) rows that merely DUPLICATE the prior bar (the 2024
+    yfinance gap-fill duplicated each prior Friday onto ~8 Sundays across ~940
+    names; genuine special weekend sessions like the Sat 2025-02-01 / Sun
+    2026-02-01 Budget sessions carry distinct prices and are KEPT), and zero /
+    non-positive OHLC fields with a valid close -> clamp into the close and
+    re-derive high/low so the bar's true range is sane (no fabricated ATR spike).
     df must already be date-sorted. Returns the cleaned, re-indexed frame."""
     d = df
     dow = d["date"].dt.dayofweek
     ohlcv = [c for c in ("open", "high", "low", "close", "volume") if c in d.columns]
     dup_prev = d[ohlcv].eq(d[ohlcv].shift()).all(axis=1) if ohlcv else False
-    d = d[~((dow == 6) | ((dow == 5) & dup_prev))].reset_index(drop=True)
+    d = d[~(dow.isin([5, 6]) & dup_prev)].reset_index(drop=True)
     if {"open", "high", "low", "close"}.issubset(d.columns):
-        z = (d["open"] == 0) & (d["high"] == 0) & (d["low"] == 0) & (d["close"] > 0)
-        if z.any():
-            d.loc[z, ["open", "high", "low"]] = d.loc[z, ["close", "close", "close"]].values
+        bad = (d["close"] > 0) & ((d["open"] <= 0) | (d["high"] <= 0) | (d["low"] <= 0))
+        if bad.any():
+            for col in ("open", "high", "low"):
+                m = bad & (d[col] <= 0)
+                d.loc[m, col] = d.loc[m, "close"]
+            d.loc[bad, "high"] = d.loc[bad, ["open", "high", "low", "close"]].max(axis=1)
+            d.loc[bad, "low"] = d.loc[bad, ["open", "high", "low", "close"]].min(axis=1)
     return d
 
 
 def load_ca(path: str) -> dict[str, list]:
-    ca = pd.read_csv(path)
+    try:
+        ca = pd.read_csv(path)
+    except (pd.errors.EmptyDataError, FileNotFoundError):
+        return {}                                   # no/empty CA file -> adjust nothing
+    if ca.empty or "ex_date" not in ca.columns:
+        return {}
     ca["ex_date"] = pd.to_datetime(ca["ex_date"])
     return {t: sorted(set(g["ex_date"])) for t, g in ca.groupby("ticker")}
 
@@ -245,8 +255,8 @@ def main():
     # cliff (the 2024-11-01 case), distinct from scattered genuine delistings.
     # Sanitizing can't recreate missing bars — surface + list them for a re-fetch.
     ld = pd.to_datetime(audit_df["last_date"]); gmax = ld.max()
-    recent = ld[ld < (gmax - pd.Timedelta(days=120))].dt.date.value_counts()
-    clustered = recent[recent >= 30]
+    recent = ld[ld < (gmax - pd.Timedelta(days=30))].dt.date.value_counts()
+    clustered = recent[recent >= 30]            # >=30 names sharing one exact date = a refresh cliff
     if len(clustered):
         cliff_dates = set(clustered.index)
         stranded = audit_df[pd.to_datetime(audit_df["last_date"]).dt.date.isin(cliff_dates)]
