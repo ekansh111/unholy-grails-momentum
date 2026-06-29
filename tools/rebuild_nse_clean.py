@@ -86,6 +86,31 @@ def find_systematic_breaks(files, min_names=6):
     return out
 
 
+def _strip_phantom_calendar_rows(df):
+    """Remove non-trading-day artifacts the upstream bhavcopy/yfinance assembler
+    injects (they flow in verbatim from the per-ticker cache):
+      * Sunday-dated bars — NSE NEVER trades on a Sunday, so every such row is
+        spurious. The 2024 yfinance recent-gap fill duplicated each prior Friday
+        onto ~8 Sundays (Jul-Oct 2024) across ~940 names; left in, they inject
+        spurious 0%-return bars into every momentum lookback.
+      * Saturday bars that merely duplicate the prior bar (genuine Saturday budget
+        sessions carry distinct prices and are kept).
+      * zero-OHLC bars (open=high=low=0 with a valid close) -> set O/H/L = close, so
+        the bar's true range is 0 rather than a fabricated prevClose-sized spike
+        that corrupts ATR / position sizing.
+    df must already be date-sorted. Returns the cleaned, re-indexed frame."""
+    d = df
+    dow = d["date"].dt.dayofweek
+    ohlcv = [c for c in ("open", "high", "low", "close", "volume") if c in d.columns]
+    dup_prev = d[ohlcv].eq(d[ohlcv].shift()).all(axis=1) if ohlcv else False
+    d = d[~((dow == 6) | ((dow == 5) & dup_prev))].reset_index(drop=True)
+    if {"open", "high", "low", "close"}.issubset(d.columns):
+        z = (d["open"] == 0) & (d["high"] == 0) & (d["low"] == 0) & (d["close"] > 0)
+        if z.any():
+            d.loc[z, ["open", "high", "low"]] = d.loc[z, ["close", "close", "close"]].values
+    return d
+
+
 def _trim_leading_stubs(df):
     """Drop leading 'stub' bars — a tiny isolated cluster of old bars separated
     from the real series by a multi-year gap (a bhavcopy artifact that otherwise
@@ -211,6 +236,7 @@ def clean_symbol(path, cal):
         return None, None
     df = df.copy(); df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values("date").drop_duplicates("date", keep="last").reset_index(drop=True)
+    df = _strip_phantom_calendar_rows(df)
     df = _trim_leading_stubs(df)
     sym = os.path.basename(path)[:-8].replace("_", ".")
     dates = df["date"].to_numpy()
@@ -241,7 +267,8 @@ def clean_symbol(path, cal):
                 resid = max(resid, float(ret[k]))
     cas = sorted((pd.Timestamp(dates[i]).date().isoformat(), round(f, 4), p) for i, (f, p) in det.items())
     audit = {
-        "symbol": sym, "n_bars": len(df), "n_cas": len(det), "n_spikes_repaired": int(n_spikes),
+        "symbol": sym, "n_bars": len(df), "last_date": pd.Timestamp(dates[-1]).date().isoformat(),
+        "n_cas": len(det), "n_spikes_repaired": int(n_spikes),
         "raw_mult": round(float(raw_mult), 2) if np.isfinite(raw_mult) else None,
         "clean_mult": round(float(clean_mult), 2) if np.isfinite(clean_mult) else None,
         "share_mult": round(float(share_mult), 2) if np.isfinite(share_mult) else None,
@@ -286,6 +313,24 @@ def main():
             print(f"  {k + 1}/{len(files)} ...", flush=True)
     au = pd.DataFrame(rows).sort_values("share_mult", ascending=False, na_position="last")
     au.to_csv(os.path.join(args.out, "_cleaning_audit.csv"), index=False)
+    # Coverage-cliff guard: an incomplete universe refresh leaves MANY names stranded
+    # on the SAME pre-cutoff date (the 2024-11-01 cliff: 419 names incl. TATAMOTORS,
+    # plus renamed ones like ZOMATO->ETERNAL). A shared truncation date distinguishes
+    # this from scattered genuine delistings (which legitimately end on many different
+    # dates and must be retained for survivorship-safety). Sanitizing can't recreate
+    # missing bars, so surface it loudly + write the stranded list for a re-fetch.
+    ld = pd.to_datetime(au["last_date"])
+    gmax = ld.max()
+    recent = ld[ld < (gmax - pd.Timedelta(days=120))].dt.date.value_counts()
+    clustered = recent[recent >= 30]                  # >=30 names sharing one date = a refresh cliff
+    if len(clustered):
+        cliff_dates = set(clustered.index)
+        stranded = au[pd.to_datetime(au["last_date"]).dt.date.isin(cliff_dates)]
+        stranded.to_csv(os.path.join(args.out, "_coverage_stranded.csv"), index=False)
+        print(f"  !! COVERAGE CLIFF: {len(stranded)} live names truncated on a shared date "
+              f"{dict(clustered)} (latest bar in data = {gmax.date()}) — an incomplete upstream "
+              f"refresh / renamed symbols, NOT delistings. Re-fetch _coverage_stranded.csv "
+              f"from each cliff date onward before trusting recent signals.", flush=True)
     print(f"\nDONE: {len(rows)} symbols | adjusted {int((au.n_cas>0).sum())} | flagged {int(au.review_flag.sum())}")
     print(f"  CA provenance: " + au["sources_used"].value_counts().head(8).to_dict().__repr__())
 
