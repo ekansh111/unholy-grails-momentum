@@ -82,8 +82,38 @@ def _repair_isolated_spikes(px: np.ndarray, passes: int = 5):
     return px, n_fixed
 
 
+def _strip_phantom_calendar_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """Remove non-trading-day artifacts carried in verbatim from the per-ticker
+    cache: weekend (Sat/Sun) rows that merely DUPLICATE the prior bar (the 2024
+    yfinance gap-fill duplicated each prior Friday onto ~8 Sundays across ~940
+    names; genuine special weekend sessions like the Sat 2025-02-01 / Sun
+    2026-02-01 Budget sessions carry distinct prices and are KEPT), and zero /
+    non-positive OHLC fields with a valid close -> clamp into the close and
+    re-derive high/low so the bar's true range is sane (no fabricated ATR spike).
+    df must already be date-sorted. Returns the cleaned, re-indexed frame."""
+    d = df
+    dow = d["date"].dt.dayofweek
+    ohlcv = [c for c in ("open", "high", "low", "close", "volume") if c in d.columns]
+    dup_prev = d[ohlcv].eq(d[ohlcv].shift()).all(axis=1) if ohlcv else False
+    d = d[~(dow.isin([5, 6]) & dup_prev)].reset_index(drop=True)
+    if {"open", "high", "low", "close"}.issubset(d.columns):
+        bad = (d["close"] > 0) & ((d["open"] <= 0) | (d["high"] <= 0) | (d["low"] <= 0))
+        if bad.any():
+            for col in ("open", "high", "low"):
+                m = bad & (d[col] <= 0)
+                d.loc[m, col] = d.loc[m, "close"]
+            d.loc[bad, "high"] = d.loc[bad, ["open", "high", "low", "close"]].max(axis=1)
+            d.loc[bad, "low"] = d.loc[bad, ["open", "high", "low", "close"]].min(axis=1)
+    return d
+
+
 def load_ca(path: str) -> dict[str, list]:
-    ca = pd.read_csv(path)
+    try:
+        ca = pd.read_csv(path)
+    except (pd.errors.EmptyDataError, FileNotFoundError):
+        return {}                                   # no/empty CA file -> adjust nothing
+    if ca.empty or "ex_date" not in ca.columns:
+        return {}
     ca["ex_date"] = pd.to_datetime(ca["ex_date"])
     return {t: sorted(set(g["ex_date"])) for t, g in ca.groupby("ticker")}
 
@@ -143,6 +173,7 @@ def clean_symbol(path: str, ca_map: dict) -> tuple[pd.DataFrame | None, dict]:
     df = df.copy()
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values("date").drop_duplicates("date", keep="last").reset_index(drop=True)
+    df = _strip_phantom_calendar_rows(df)
     sym = os.path.basename(path)[:-8].replace("_", ".")
     dates = df["date"].to_numpy()
 
@@ -183,7 +214,8 @@ def clean_symbol(path: str, ca_map: dict) -> tuple[pd.DataFrame | None, dict]:
     resid_pct = round((np.exp(resid) - 1) * 100, 0)
     cas = sorted((pd.Timestamp(dates[i]).date().isoformat(), round(float(f), 3)) for i, f in det.items())
     audit = {
-        "symbol": sym, "n_bars": len(df), "n_cas": len(det), "n_spikes_repaired": int(n_spikes),
+        "symbol": sym, "n_bars": len(df), "last_date": pd.Timestamp(dates[-1]).date().isoformat(),
+        "n_cas": len(det), "n_spikes_repaired": int(n_spikes),
         "raw_mult": round(float(raw_mult), 2) if np.isfinite(raw_mult) else None,
         "clean_mult": round(float(clean_mult), 2) if np.isfinite(clean_mult) else None,
         "share_mult": round(float(share_mult), 2) if np.isfinite(share_mult) else None,
@@ -219,6 +251,19 @@ def main():
             print(f"  {k + 1}/{len(files)} ...", flush=True)
     audit_df = pd.DataFrame(rows).sort_values("share_mult", ascending=False, na_position="last")
     audit_df.to_csv(os.path.join(args.out, "_cleaning_audit.csv"), index=False)
+    # Coverage-cliff guard: >=30 names sharing one pre-cutoff last-date = a refresh
+    # cliff (the 2024-11-01 case), distinct from scattered genuine delistings.
+    # Sanitizing can't recreate missing bars — surface + list them for a re-fetch.
+    ld = pd.to_datetime(audit_df["last_date"]); gmax = ld.max()
+    recent = ld[ld < (gmax - pd.Timedelta(days=30))].dt.date.value_counts()
+    clustered = recent[recent >= 30]            # >=30 names sharing one exact date = a refresh cliff
+    if len(clustered):
+        cliff_dates = set(clustered.index)
+        stranded = audit_df[pd.to_datetime(audit_df["last_date"]).dt.date.isin(cliff_dates)]
+        stranded.to_csv(os.path.join(args.out, "_coverage_stranded.csv"), index=False)
+        print(f"  !! COVERAGE CLIFF: {len(stranded)} live names truncated on a shared date "
+              f"{dict(clustered)} (latest bar = {gmax.date()}) — incomplete upstream refresh / "
+              f"renamed symbols, NOT delistings. Re-fetch _coverage_stranded.csv.", flush=True)
     n_adj = int((audit_df["n_cas"] > 0).sum())
     n_flag = int(audit_df["review_flag"].sum())
     print(f"\nDONE: wrote {len(rows)} cleaned symbols to {args.out}")
